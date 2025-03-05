@@ -1,6 +1,13 @@
 #!/bin/bash
 
-set -e
+set -euo pipefail
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
 # Variables
 CONFIG_REPO="https://github.com/afakari/dotfiles.git"
@@ -20,64 +27,57 @@ NO_CHROME=false
 # Parse command-line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --no-dns)
-            NO_DNS=true
-            shift
-            ;;
-        --no-golang)
-            NO_GOLANG=true
-            shift
-            ;;
-        --no-docker)
-            NO_DOCKER=true
-            shift
-            ;;
-        --no-vscode)
-            NO_VSCODE=true
-            shift
-            ;;
-        --no-chrome)
-            NO_CHROME=true
-            shift
-            ;;
-        *)
-            echo "Unknown option: $1"
-            exit 1
-            ;;
+        --no-dns) NO_DNS=true ;;
+        --no-golang) NO_GOLANG=true ;;
+        --no-docker) NO_DOCKER=true ;;
+        --no-vscode) NO_VSCODE=true ;;
+        --no-chrome) NO_CHROME=true ;;
+        *) echo -e "${RED}Unknown option: $1${NC}"; exit 1 ;;
     esac
+    shift
 done
 
+# Trap for graceful exit
+trap 'echo -e "${RED}Script interrupted. Exiting...${NC}"; exit 1' INT TERM
+
+# Helper function to print messages
+log() {
+    local level=$1
+    local message=$2
+    case $level in
+        info) echo -e "${BLUE}[INFO]${NC} $message" ;;
+        success) echo -e "${GREEN}[SUCCESS]${NC} $message" ;;
+        warning) echo -e "${YELLOW}[WARNING]${NC} $message" ;;
+        error) echo -e "${RED}[ERROR]${NC} $message" ;;
+    esac
+}
+
+# Check prerequisites
 check_prerequisites() {
-    echo "Checking prerequisites..."
+    log info "Checking prerequisites..."
 
     if [[ $EUID -ne 0 ]]; then
-        echo "This script must be run as root. Use sudo to execute the script."
+        log error "This script must be run as root. Use sudo to execute the script."
         exit 1
     fi
 
     if ! ping -c 1 google.com &> /dev/null; then
-        echo "Internet connection is required. Please check your connection and try again."
+        log error "Internet connection is required. Please check your connection and try again."
         exit 1
     fi
 }
 
+# Set up Iranian repositories
 set_iranian_repos() {
-    echo "Setting up Iranian repositories..."
+    log info "Setting up Iranian repositories..."
 
     if [ -f /etc/os-release ]; then
         source /etc/os-release
 
         case $ID in
-            ubuntu)
-                mirror="http://ir.archive.ubuntu.com/ubuntu/"
-                ;;
-            debian)
-                mirror="http://debian.ir/debian/"
-                ;;
-            *)
-                echo "Unsupported OS: $ID"
-                exit 1
-                ;;
+            ubuntu) mirror="http://ir.archive.ubuntu.com/ubuntu/" ;;
+            debian) mirror="http://debian.ir/debian/" ;;
+            *) log error "Unsupported OS: $ID"; exit 1 ;;
         esac
 
         cat > /etc/apt/sources.list <<EOL
@@ -85,175 +85,198 @@ deb $mirror ${VERSION_CODENAME} main restricted universe multiverse
 deb $mirror ${VERSION_CODENAME}-updates main restricted universe multiverse
 deb $mirror ${VERSION_CODENAME}-security main restricted universe multiverse
 EOL
-        echo "Iranian repositories configured for $ID ($VERSION_CODENAME)."
+        log success "Iranian repositories configured for $ID ($VERSION_CODENAME)."
     else
-        echo "Unable to determine OS version. /etc/os-release is missing."
+        log error "Unable to determine OS version. /etc/os-release is missing."
         exit 1
     fi
 }
 
+# Set up DNS
 setup_dns() {
     if $NO_DNS; then
-        echo "Skipping DNS setup as per --no-dns flag."
+        log warning "Skipping DNS setup as per --no-dns flag."
         return
     fi
 
-    echo "Setting up DNS..."
+    log info "Setting up DNS..."
     dns_servers=("178.22.122.100" "185.51.200.2")
 
     if [ -f /etc/resolv.conf ]; then
-        echo "Backing up existing /etc/resolv.conf..."
+        log info "Backing up existing /etc/resolv.conf..."
         cp /etc/resolv.conf /etc/resolv.conf.bak
 
-        echo "Updating DNS servers..."
+        log info "Updating DNS servers..."
         {
             for dns in "${dns_servers[@]}"; do
                 echo "nameserver $dns"
             done
         } > /etc/resolv.conf
 
-        echo "DNS setup complete. Current DNS servers:" \
-            && cat /etc/resolv.conf
+        log success "DNS setup complete. Current DNS servers:"
+        cat /etc/resolv.conf
     else
-        echo "DNS setup failed: /etc/resolv.conf not found."
+        log error "DNS setup failed: /etc/resolv.conf not found."
         exit 1
     fi
 }
 
+# Update system
 update_system() {
-    echo "Updating system..."
+    log info "Updating system..."
     apt update -qq -y && apt upgrade -qq -y
+    log success "System updated successfully."
 }
 
+# Install a package
 install_package() {
-    echo "Installing $1..."
-    if ! dpkg -l | grep -qw "$1"; then
-        apt install -qq -y $1 > /dev/null
-        echo "$1 installation completed."
+    local package=$1
+    log info "Installing $package..."
+    if ! dpkg -l | grep -qw "$package"; then
+        apt install -qq -y "$package" > /dev/null
+        log success "$package installed successfully."
     else
-        echo "$1 is already installed. Skipping installation."
+        log warning "$package is already installed. Skipping installation."
     fi
 }
 
+# Install a .deb package
 install_deb_package() {
     local url=$1
     local deb_file=${url##*/}
-    echo "Downloading and installing $deb_file..."
-    wget -q $url -O /tmp/$deb_file
-    dpkg -i /tmp/$deb_file > /dev/null 2>&1 || apt install -f -y > /dev/null 2>&1
-    rm /tmp/$deb_file
+    log info "Downloading and installing $deb_file..."
+    wget -q --show-progress -O /tmp/"$deb_file" "$url"
+    dpkg -i /tmp/"$deb_file" > /dev/null 2>&1 || apt install -f -y > /dev/null 2>&1
+    rm /tmp/"$deb_file"
+    log success "$deb_file installed successfully."
 }
 
+# Install Go
 install_golang() {
     if $NO_GOLANG; then
-        echo "Skipping Go installation as per --no-golang flag."
+        log warning "Skipping Go installation as per --no-golang flag."
         return
     fi
 
-    echo "Installing Go..."
-    wget -c https://go.dev/dl/go1.23.4.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
+    log info "Installing Go..."
+    wget -c --show-progress https://go.dev/dl/go1.23.4.linux-amd64.tar.gz -O - | sudo tar -xz -C /usr/local
     export PATH=$PATH:/usr/local/go/bin
     source ~/.profile
     go version || {
-        echo "Go installation failed. Please check logs.";
+        log error "Go installation failed. Please check logs."
+        exit 1
     }
+    log success "Go installed successfully."
 }
 
+# Install Docker
 install_docker() {
     if $NO_DOCKER; then
-        echo "Skipping Docker installation as per --no-docker flag."
+        log warning "Skipping Docker installation as per --no-docker flag."
         return
     fi
 
-    echo "Installing Docker..."
+    log info "Installing Docker..."
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg > /dev/null 2>&1
     echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
     apt update -qq -y
     apt-get install -qq -y docker-ce docker-ce-cli containerd.io > /dev/null
     docker --version || {
-        echo "Docker installation failed. Please check logs.";
+        log error "Docker installation failed. Please check logs."
+        exit 1
     }
+    log success "Docker installed successfully."
 }
 
+# Set up Oh My Zsh
 setup_oh_my_zsh() {
     if [ ! -d "$USER_HOME/.oh-my-zsh" ]; then
-        echo "Installing Oh My Zsh..."
+        log info "Installing Oh My Zsh..."
         sh -c "$(wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O -)" || {
-            echo "Oh My Zsh installation failed. Please check logs.";
+            log error "Oh My Zsh installation failed. Please check logs."
+            exit 1
         }
+        log success "Oh My Zsh installed successfully."
     else
-        echo "Oh My Zsh is already installed. Skipping installation."
+        log warning "Oh My Zsh is already installed. Skipping installation."
     fi
 }
 
+# Copy configuration files
 copy_config_files() {
-    echo "Downloading configuration files..."
+    log info "Downloading configuration files..."
     if [ -d "$CONFIG_DIR" ]; then
-        echo "Configuration directory already exists. Updating..."
-        git -C $CONFIG_DIR pull
+        log info "Configuration directory already exists. Updating..."
+        git -C "$CONFIG_DIR" pull
     else
-        git clone $CONFIG_REPO $CONFIG_DIR
+        git clone "$CONFIG_REPO" "$CONFIG_DIR"
     fi
 
-    echo "Copying configuration files..."
-    cp -r $CONFIG_DIR/dotfiles/zshrc $USER_HOME/.zshrc
-    cp -r $CONFIG_DIR/dotfiles/tmux.conf $USER_HOME/.tmux.conf
-    mkdir -p $USER_HOME/.local/kitty
-    cp -r $CONFIG_DIR/dotfiles/kitty.conf $USER_HOME/.local/kitty/kitty.conf
+    log info "Copying configuration files..."
+    cp -r "$CONFIG_DIR"/dotfiles/zshrc "$USER_HOME"/.zshrc
+    cp -r "$CONFIG_DIR"/dotfiles/tmux.conf "$USER_HOME"/.tmux.conf
+    mkdir -p "$USER_HOME"/.local/kitty
+    cp -r "$CONFIG_DIR"/dotfiles/kitty.conf "$USER_HOME"/.local/kitty/kitty.conf
 
     # Ensure the user owns their home directory files
-    chown -R $(logname):$(logname) $USER_HOME
+    chown -R "$(logname):$(logname)" "$USER_HOME"
+    log success "Configuration files copied successfully."
 }
 
+# Install Warp
 install_warp() {
-    echo "Setting up Warp..."
+    log info "Setting up Warp..."
     if ! command -v warp &> /dev/null; then
-        echo "Downloading Warp Plus..."
-        wget -q $WARP_PLUS_URL -O $WARP_PLUS_ZIP
+        log info "Downloading Warp Plus..."
+        wget -q --show-progress "$WARP_PLUS_URL" -O "$WARP_PLUS_ZIP"
 
-        echo "Extracting Warp Plus..."
-        mkdir -p $WARP_PLUS_DIR
-        unzip -q $WARP_PLUS_ZIP -d $WARP_PLUS_DIR
+        log info "Extracting Warp Plus..."
+        mkdir -p "$WARP_PLUS_DIR"
+        unzip -q "$WARP_PLUS_ZIP" -d "$WARP_PLUS_DIR"
 
-        echo "Installing Warp..."
-        mv $WARP_PLUS_DIR/warp-plus /usr/local/bin/warp
+        log info "Installing Warp..."
+        mv "$WARP_PLUS_DIR"/warp-plus /usr/local/bin/warp
 
-        echo "Cleaning up..."
-        rm -rf $WARP_PLUS_ZIP $WARP_PLUS_DIR
+        log info "Cleaning up..."
+        rm -rf "$WARP_PLUS_ZIP" "$WARP_PLUS_DIR"
 
-        echo "Warp installed successfully. You can now use the 'warp' command."
+        log success "Warp installed successfully. You can now use the 'warp' command."
     else
-        echo "Warp is already installed. Skipping installation."
+        log warning "Warp is already installed. Skipping installation."
     fi
 }
 
-echo "Setting up your environment..."
+# Main function
+main() {
+    check_prerequisites
+    set_iranian_repos
+    update_system
 
-check_prerequisites
-set_iranian_repos
-update_system
+    packages=(apt-transport-https ca-certificates lsb-release xclip python3 python3-pip vim zsh tmux kitty tor git wget fzf autojump)
+    for package in "${packages[@]}"; do
+        install_package "$package"
+    done
 
-packages=(apt-transport-https ca-certificates lsb-release xclip python3 python3-pip vim zsh tmux kitty tor git wget fzf autojump)
-for package in "${packages[@]}"; do
-    install_package $package
-done
+    if ! $NO_VSCODE && ! command -v code &> /dev/null; then
+        install_deb_package "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64"
+    else
+        log warning "Visual Studio Code installation skipped or already installed."
+    fi
 
-if ! $NO_VSCODE && ! command -v code &> /dev/null; then
-    install_deb_package "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64"
-else
-    echo "Visual Studio Code installation skipped or already installed."
-fi
+    if ! $NO_CHROME && ! command -v google-chrome &> /dev/null; then
+        install_deb_package "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+    else
+        log warning "Google Chrome installation skipped or already installed."
+    fi
 
-if ! $NO_CHROME && ! command -v google-chrome &> /dev/null; then
-    install_deb_package "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
-else
-    echo "Google Chrome installation skipped or already installed."
-fi
+    setup_oh_my_zsh
+    install_golang
+    install_docker
+    install_warp
+    copy_config_files
 
-setup_oh_my_zsh
-install_golang
-install_docker
-install_warp
-copy_config_files
+    log success "Environment setup complete! You may need to log out and log back in for changes to take effect."
+}
 
-echo "Environment setup complete! You may need to log out and log back in for changes to take effect."
+# Run the script
+main
