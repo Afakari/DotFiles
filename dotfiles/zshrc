@@ -41,7 +41,7 @@ ZSH_THEME="robbyrussell"
 # DISABLE_AUTO_TITLE="true"
 
 # Uncomment the following line to enable command auto-correction.
-# ENABLE_CORRECTION="true"
+ENABLE_CORRECTION="true"
 
 # Uncomment the following line to display red dots whilst waiting for completion.
 # You can also set it to another string to have that shown instead of the default red dots.
@@ -70,8 +70,10 @@ ZSH_THEME="robbyrussell"
 # Custom plugins may be added to $ZSH_CUSTOM/plugins/
 # Example format: plugins=(rails git textmate ruby lighthouse)
 # Add wisely, as too many plugins slow down shell startup.
-plugins=(git  colored-man-pages zsh-interactive-cd colorize autojump command-not-found copybuffer jump shell-proxy)
+plugins=(git colored-man-pages zsh-interactive-cd colorize autojump command-not-found jump shell-proxy python)
 
+zstyle ':completion:*:*:docker:*' option-stacking yes
+zstyle ':completion:*:*:docker-*:*' option-stacking yes
 source $ZSH/oh-my-zsh.sh
 
 # User configuration
@@ -115,4 +117,13 @@ git_prompt_info() {
 }
 
 PS1='%F{%(#.cyan.green)}┌──${debian_chroot:+($debian_chroot)─}${VIRTUAL_ENV:+($(basename $VIRTUAL_ENV))─}(%B%F{%(#.magenta.yellow)}%n㉿%m%b%F{%(#.cyan.green)})-[%B%F{blue}%(6~.%-1~/…/%4~.%5~)%b%F{%(#.cyan.green)}]%F{reset} $(git_prompt_info)
-%F{green}└─%B%(#.%F{magenta}#.%F{purple}$)%b%F{reset}'
+%F{green}└─%B%(#.%F{magenta}#.%F{purple}$)%b%F{reset}%F{yellow}'
+
+# Created by `pipx` on 2024-10-14 11:45:40
+export PATH="$PATH:/home/kitty/.local/bin"
+
+declare -x ORACLE_HOME="/usr/lib/oracle"
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
