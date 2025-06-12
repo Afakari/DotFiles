@@ -205,7 +205,6 @@ install_sdkman() {
     sudo -u "$USER_NAME" bash -c "source \"$USER_HOME/.sdkman/bin/sdkman-init.sh\" && sdk version" || { log error "SDKMAN installation failed."; exit 1; }
     sudo -u "$USER_NAME" bash -c "source \"$USER_HOME/.sdkman/bin/sdkman-init.sh\" && sdk install java $OPENJDK_VERSION-open" || { log error "OpenJDK $OPENJDK_VERSION installation failed."; exit 1; }
     sudo -u "$USER_NAME" bash -c "source \"$USER_HOME/.sdkman/bin/sdkman-init.sh\" && sdk install scala" || { log error "Scala installation failed."; exit 1; }
-    $NO_GOLANG || sudo -u "$USER_NAME" bash -c "source \"$USER_HOME/.sdkman/bin/sdkman-init.sh\" && sdk install go && go version" || { log error "Go installation failed."; exit 1; }
     chown -R "$USER_NAME:$USER_NAME" "$USER_HOME/.sdkman"
     log success "SDKMAN, OpenJDK $OPENJDK_VERSION, Scala, and Go installed."
 }
