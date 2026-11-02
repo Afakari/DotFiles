@@ -79,7 +79,7 @@ palette = 12=#7b9ef0
 palette = 13=#f2a4db
 palette = 14=#5abfb5
 palette = 15=#b5bfe2
-font-size = 14
+font-size = 17
 mouse-hide-while-typing = true
 gtk-titlebar = false
 gtk-titlebar-hide-when-maximized = true

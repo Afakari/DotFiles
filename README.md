@@ -1,113 +1,97 @@
-# Environment Setup Script
+# DotFiles
 
-Automate env setup for Debian/Ubuntu.
-Installing my popular tools and some control over stuff
+My config files, and a list of the apps I use (`APPS.md`). No install scripts: on a new machine,
+pick what is needed from `APPS.md`, install it with that system's package manager, then copy the
+configs below into place.
 
----
+Copied from my Fedora 44 desktop on 2026-11-02.
 
-## Features
+## What goes where
 
-- **Prerequisite Checks**: Ensures the script is run as root and has an internet connection.
-- **Iranian Repositories**: Configures APT repositories for faster package downloads in Iran.
-- **DNS Setup**: Configures DNS servers for better connectivity.
-- **Package Installation**: Installs essential packages.
-- **Optional Installations**:
-    - Visual Studio Code
-    - Google Chrome
-    - Docker
-    - Go (Golang)
-- **Configuration Files**: Downloads and applies custom configuration files.
-- **Argument Support**: Allows skipping specific installations using command-line flags.
+| in this repo | goes to | for |
+|---|---|---|
+| `zsh/.zshrc` | `~/.zshrc` | zsh with oh-my-zsh |
+| `git/.gitconfig` | `~/.gitconfig` | git, with delta as the pager |
+| `nvim/` | `~/.config/nvim/` | Neovim (NvChad v2.5) |
+| `kitty/` | `~/.config/kitty/` | kitty |
+| `tmux/.tmux.conf` | `~/.tmux.conf` | tmux |
+| `zellij/config.kdl` | `~/.config/zellij/config.kdl` | zellij |
+| `ghostty/config` | `~/.config/ghostty/config` | ghostty |
+| `alacritty/dank-theme.toml` | `~/.config/alacritty/dank-theme.toml` | alacritty theme |
 
----
+Copy one:
 
-## Prerequisites
+```bash
+cp zsh/.zshrc ~/.zshrc
+mkdir -p ~/.config/nvim && cp -r nvim/. ~/.config/nvim/
+```
 
-- **Operating System**: Ubuntu or Debian-based Linux distributions.
-- **Permissions**: The script must be run as root (use `sudo`).
-- **Internet Connection**: Required for downloading packages and repositories.
+Or link it, so edits land in the repo:
 
----
+```bash
+ln -sf "$PWD/zsh/.zshrc" ~/.zshrc
+ln -sfn "$PWD/nvim" ~/.config/nvim
+```
 
-## Usage
+## zsh
 
-1. **Download the Script**:
-   ```bash
-   wget https://example.com/path/to/setup_script.sh
-   chmod +x setup_script.sh
-   ```
+`.zshrc` needs oh-my-zsh and three plugins that are not part of it, cloned into
+`~/.oh-my-zsh/custom/plugins/`:
 
-2. **Run the Script**:
-   ```bash
-   sudo ./setup_script.sh [OPTIONS]
-   ```
+```bash
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" --unattended
+git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions
+git clone https://github.com/zdharma-continuum/fast-syntax-highlighting ~/.oh-my-zsh/custom/plugins/fast-syntax-highlighting
+git clone https://github.com/Aloxaf/fzf-tab ~/.oh-my-zsh/custom/plugins/fzf-tab
+```
 
-### Command-Line Options
+It also calls `zoxide`, `direnv`, `atuin`, `fzf`, `eza`, `bat` and `trash-cli`; see `APPS.md`.
+Settings for one machine only (work paths, hosts, aliases like `hqt`) go in `~/.zshrc.local`,
+which `.zshrc` sources if it exists. It is not in this repo.
 
-| Option          | Description                                      |
-|-----------------|--------------------------------------------------|
-| `--no-dns`      | Skip DNS configuration.                          |
-| `--no-golang`   | Skip Go (Golang) installation.                   |
-| `--no-docker`   | Skip Docker installation.                        |
-| `--no-vscode`   | Skip Visual Studio Code installation.            |
-| `--no-chrome`   | Skip Google Chrome installation.                 |
+After `atuin` is installed, `atuin import zsh` loads the old `~/.zsh_history` into it.
+After `tealdeer` is installed, `tldr --update` downloads the pages.
 
-### Examples
+### Keys
 
-- **Run the script with all features**:
-  ```bash
-  sudo ./setup_script.sh
-  ```
+| key | does |
+|---|---|
+| Ctrl-R | search history (atuin; Ctrl-R again inside it switches global / this folder / this session) |
+| Ctrl-T | pick a file with fzf and paste its path |
+| Alt-C | pick a folder with fzf and cd into it |
+| Tab | completions in an fzf list (fzf-tab) |
+| Ctrl-X Ctrl-E | edit the current command in nvim |
 
-- **Skip DNS and Docker installation**:
-  ```bash
-  sudo ./setup_script.sh --no-dns --no-docker
-  ```
+### Aliases
 
-- **Skip Chrome and Go installation**:
-  ```bash
-  sudo ./setup_script.sh --no-chrome --no-golang
-  ```
+| alias | runs |
+|---|---|
+| `dc`, `cd..`, `sl`, `gti`, `exti` | typos of `cd`, `cd ..`, `ls`, `git`, `exit` |
+| `ls`, `ll`, `lt` | eza: list, long list with git status, tree two levels deep |
+| `cat` | `bat -pp` (colours, no pager) |
+| `del` | `trash-put` (to the trash; `trash-list`, `trash-restore` bring it back) |
+| `z <part>`, `j <part>` | jump to the most used folder that matches |
+| `zi`, `ji` | pick the folder from a list |
+| `lg` | lazygit |
+| `docker` | podman |
+| `ptui` | podman-tui |
+| `port <host> <port>` | `nc -vz`: is the port open |
+| `hq` | harlequin (SQL TUI) |
+| `nv` | nvim |
+| `copy` | xclip to the clipboard |
+| `dl` | aria2c with 16 connections |
+| `todo` | topydo |
 
----
+## git
 
-## What the Script Installs
+`.gitconfig` has no `[user]`: it includes `~/.gitconfig.local`, which holds the name and email
+for that machine:
 
-### Packages
-- `apt-transport-https`
-- `ca-certificates`
-- `lsb-release`
-- `xclip`
-- `python3`
-- `python3-pip`
-- `vim`
-- `zsh`
-- `tmux`
-- `kitty`
-- `tor`
-- `git`
-- `wget`
-- `fzf`
-- `autojump`
+```ini
+[user]
+	email = you@example.com
+	name = you
+```
 
-### Tools
-- **Visual Studio Code**: A code editor.
-- **Google Chrome**: A web browser.
-- **Docker**: A platform for containerized applications.
-- **Go (Golang)**: A programming language.
-- **Warp Plus**: A CLI tool for enhanced connectivity.
-
-### Configuration Files
-- `.zshrc`: Configuration for Zsh.
-- `.tmux.conf`: Configuration for Tmux.
-- `kitty.conf`: Configuration for Kitty terminal.
-
----
-
-## Customization
-
-You can customize the script by modifying the following variables:
-
-- **Repositories**: Edit the `set_iranian_repos` function to change the mirror URLs.
-- **DNS Servers**: Modify the `dns_servers` array in the `setup_dns` function.
-- **Packages**: Add or remove packages from the `packages` array.
+`delta` shows diffs with syntax colours and line numbers in `git diff`, `git show` and `git log -p`.
+`n` and `N` jump between files. Merge conflicts use the `zdiff3` style (shows the common base).

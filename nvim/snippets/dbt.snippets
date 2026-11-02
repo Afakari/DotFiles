@@ -1,0 +1,60 @@
+snippet ref ref()
+	{{ ref('${1}') }}
+
+snippet source source()
+	{{ source('${1}', '${2}') }}
+
+snippet config config block
+	{{
+	  config(
+	    materialized='${1:table}',
+	  )
+	}}
+	${0}
+
+snippet incremental is_incremental() block
+	{% if is_incremental() %}
+	  ${1:WHERE updated_at > (SELECT max(updated_at) FROM {{ this }})}
+	{% endif %}
+
+snippet macro macro definition
+	{% macro ${1:name}(${2}) %}
+	  ${0}
+	{%- endmacro %}
+
+snippet if if block
+	{% if ${1} %}
+	  ${0}
+	{% endif %}
+
+snippet ifelse if/else block
+	{% if ${1} %}
+	  ${2}
+	{% else %}
+	  ${0}
+	{% endif %}
+
+snippet for for loop
+	{% for ${1:item} in ${2:items} %}
+	  ${0}{{ "," if not loop.last }}
+	{% endfor %}
+
+snippet set set variable
+	{% set ${1:name} = ${0} %}
+
+snippet setblock set block
+	{% set ${1:name} %}
+	  ${0}
+	{% endset %}
+
+snippet var var()
+	{{ var('${1}') }}
+
+snippet this this relation
+	{{ this }}
+
+snippet cmt Jinja comment
+	{# ${0} #}
+
+snippet log log()
+	{{ log(${1}, info=true) }}
